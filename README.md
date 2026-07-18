@@ -22,32 +22,16 @@ The VM lives in the private subnet with no public IP, so it is unreachable from 
 | NIC | `Landing_Zone_NIC` | VM network interface, private subnet, dynamic private IP |
 | Virtual Machine | `hugo-vm` | Ubuntu 24.04 LTS, `Standard_D2s_v3`, SSH key auth |
 
-## AWS to Azure mapping
-
-Coming from AWS, these are the equivalents this project uses:
-
-| AWS | Azure | Difference worth knowing |
-|---|---|---|
-| — | Resource Group | No AWS equivalent. Every Azure resource lives in one; deleting the group deletes everything inside it. |
-| VPC | Virtual Network (VNet) | Same idea, same CIDR-based address space. |
-| Subnet | Subnet | Azure subnets are not tied to an availability zone. "Public" vs "private" is convention, not a property. |
-| Security Group | Network Security Group (NSG) | Attaches to subnets or NICs via a separate association resource, not inline on the instance. |
-| Route Table | Route Table / User-Defined Routes | Attached via `azurerm_subnet_route_table_association`. This project needs none — see NAT note below. |
-| Internet Gateway | (implicit) | Azure VNets have internet routing by default; there is no IGW resource to create. |
-| NAT Gateway | NAT Gateway | AWS NAT lives in a public subnet and needs a route table entry. Azure NAT attaches directly to the private subnet and Azure injects the route automatically. |
-| ENI | Network Interface (NIC) | Standalone resource in both; created here as its own resource and referenced by the VM. |
-| EC2 Instance | Virtual Machine | Image selection via `source_image_reference` (publisher/offer/sku) instead of an AMI ID. |
-| `map_public_ip_on_launch` | — | No subnet-level flag. A VM is "public" only if its NIC has a public IP and an NSG allows inbound. |
 
 ## The association-resource pattern
 
-The least obvious thing coming from AWS. Where AWS attaches a security group directly on the instance, Azure models attachments as their own resources. This project uses three:
+Having done something similar on AWS, where AWS attaches a security group directly on the instance, Azure models attachments as their own resources. This project uses three:
 
 - `azurerm_subnet_network_security_group_association` (`mainAssoNSG`) — NSG ↔ public subnet
 - `azurerm_nat_gateway_public_ip_association` (`mainNAT-Association`) — NAT Gateway ↔ public IP
 - `azurerm_subnet_nat_gateway_association` (`privateAssociation`) — NAT Gateway ↔ private subnet
 
-Each association references both sides by ID, creating an implicit dependency chain: Terraform builds the joined resources first and the association last. On `terraform destroy` the order reverses — associations drop before the resources they join. The same rule applies as with AWS route tables: keep attachments as separate resources and never mix them with inline definitions.
+Each association references both sides by ID, creating an implicit dependency. Terraform builds the joined resources first and the association last. On `terraform destroy` the order reverses, as associations drop before the resources they join. The same rule applies as with AWS route tables.
 
 ## Verifying the NAT Gateway
 
@@ -60,30 +44,37 @@ curl ifconfig.me
 The IP returned matches `terraform output nat_public_ip`, proving outbound traffic from the private subnet flows through the NAT Gateway:
 
 <!-- Replace with your screenshot -->
-![NAT verification](images/nat-verification.png)
+<img width="2782" height="1252" alt="image" src="https://github.com/user-attachments/assets/75d87aa2-170c-4840-8ff0-70c114380873" />
 
-## Usage
+)
+
+## Command Usage in the course of this project
 
 ```powershell
 az login
+az account show
+az feature register --namespace Microsoft.Network --name AllowBringYourOwnPublicIpAddress
+az feature show --namespace Microsoft.Network --name AllowBringYourOwnPublicIpAddress -o table
+az provider register --namespace Microsoft.Network
+az provider show --namespace Microsoft.Network --query registrationState -o tsv
 terraform init
+terraform validate
+terraform fmt
 terraform plan
 terraform apply
+terraform state show
+terraform output
 ```
 
 Requires:
 - Terraform >= 1.5, azurerm provider
 - Azure CLI, authenticated
-- An SSH key pair at `C:/Users/<you>/.ssh/id_rsa` (`ssh-keygen -t rsa -b 4096`)
-- Your admin IP in `terraform.tfvars` (see `terraform.tfvars.example`)
+- An SSH key pair
+- Admin IP in `variables.tf`
 
 ## Teardown
 
-The VM (`Standard_D2s_v3`) and NAT Gateway bill by the hour, so destroy when done:
-
-```powershell
-terraform destroy
-```
+The VM and NAT Gateway are been charged per hour, so a `terraform destroy` was performed at the end of the project.
 
 ## What I learned
 
@@ -91,5 +82,5 @@ terraform destroy
 - The resource-group-first structure and how it changes the blast radius of a delete
 - Azure's association-resource pattern vs AWS inline attachment
 - How implicit dependencies drive both create and destroy order
-- Deploying a genuinely private VM and verifying its egress path without SSH access
+- Deploying a private VM and verifying its egress path without SSH access
 - `terraform fmt`, `validate`, and `plan` as the local feedback loop before any apply
