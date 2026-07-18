@@ -4,7 +4,7 @@ A hand-written Azure network foundation: a VNet with public and private subnets,
 
 ## Architecture
 
-![Architecture diagram](images/architecture.png)
+
 
 The VM lives in the private subnet with no public IP, so it is unreachable from the internet. Its outbound traffic exits through the NAT Gateway, which holds the only egress public IP. The public subnet carries an NSG allowing SSH from a single admin IP, ready for a bastion or public-facing workload.
 
@@ -43,6 +43,9 @@ curl ifconfig.me
 
 The IP returned matches `terraform output nat_public_ip`, proving outbound traffic from the private subnet flows through the NAT Gateway:
 
+<img width="2354" height="178" alt="image" src="https://github.com/user-attachments/assets/674a5aed-c8c8-40f2-a92d-e727e6129598" />
+
+
 <!-- Replace with your screenshot -->
 <img width="2782" height="1252" alt="image" src="https://github.com/user-attachments/assets/75d87aa2-170c-4840-8ff0-70c114380873" />
 
@@ -66,15 +69,20 @@ terraform state show
 terraform output
 ```
 
-Requires:
-- Terraform >= 1.5, azurerm provider
-- Azure CLI, authenticated
-- An SSH key pair
-- Admin IP in `variables.tf`
-
 ## Teardown
 
 The VM and NAT Gateway are been charged per hour, so a `terraform destroy` was performed at the end of the project.
+
+## Issues faced and how they were fixed
+
+1. Azure rejecting HUGO_vm because VM names can't contain underscores, and why `terraform validate` couldn't catch it.
+2. Ran `terraform init` before any .tf files existed. Fixed by creating the configuration files, saving the changes and re-running init.
+3. I initially started deploying the resources in eastus region but the VM couldn't deploy because eastus had capacity restrictions on B1s size for the subscription. I fixed the issue by moving the deployment to centralus with Standard_D2s_v3 as the size. Since the region flows down from the resource group as an implicit dependency, the clean path was `terraform destroy --auto-approve`, change the location value, fresh `terraform apply`.
+4. The most overwhelming issue faced was updating the NAT gateway's public IP which kept failing with a 400 error, even though the config never pinned a specific IP. Searched through the portal to register it, but couldn't find the feature. Fixed properly in Cloud Shell with the following azure commands:
+az feature register --namespace Microsoft.Network --name AllowBringYourOwnPublicIpAddress
+az provider register --namespace Microsoft.Network
+then waiting a few minutes for propagation before applying again. The key detail was that the provider re-register step is required even when the provider already shows Registered, because that's what propagates the new feature.
+
 
 ## What I learned
 
