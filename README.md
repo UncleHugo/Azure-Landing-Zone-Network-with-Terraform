@@ -79,8 +79,8 @@ The VM and NAT Gateway are been charged per hour, so a `terraform destroy` was p
 2. Ran `terraform init` before any .tf files existed. Fixed by creating the configuration files, saving the changes and re-running init.
 3. I initially started deploying the resources in eastus region but the VM couldn't deploy because eastus had capacity restrictions on B1s size for the subscription. I fixed the issue by moving the deployment to centralus with Standard_D2s_v3 as the size. Since the region flows down from the resource group as an implicit dependency, the clean path was `terraform destroy --auto-approve`, change the location value, fresh `terraform apply`.
 4. The most overwhelming issue faced was updating the NAT gateway's public IP which kept failing with a 400 error, even though the config never pinned a specific IP. Searched through the portal to register it, but couldn't find the feature. Fixed properly in Cloud Shell with the following azure commands:
-az feature register --namespace Microsoft.Network --name AllowBringYourOwnPublicIpAddress
-az provider register --namespace Microsoft.Network
+(az feature register --namespace Microsoft.Network --name AllowBringYourOwnPublicIpAddress)
+(az provider register --namespace Microsoft.Network)
 then waiting a few minutes for propagation before applying again. The key detail was that the provider re-register step is required even when the provider already shows Registered, because that's what propagates the new feature.
 
 
