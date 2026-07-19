@@ -1,4 +1,6 @@
 1. Architectural diagram.
+<img width="817" height="701" alt="architectural_diagram" src="https://github.com/user-attachments/assets/906336b9-52c5-4ab8-9f77-b1cb7f6b8e0c" />
+
    
 
 2. nat verification
