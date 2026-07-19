@@ -4,6 +4,7 @@ A hand-written Azure network foundation: a VNet with public and private subnets,
 
 ## Architecture
 
+<img width="817" height="701" alt="architectural_diagram" src="https://github.com/user-attachments/assets/39f3824b-8a77-4804-bf10-e178c11a0b95" />
 
 
 The VM lives in the private subnet with no public IP, so it is unreachable from the internet. Its outbound traffic exits through the NAT Gateway, which holds the only egress public IP. The public subnet carries an NSG allowing SSH from a single admin IP, ready for a bastion or public-facing workload.
